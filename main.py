@@ -1,25 +1,44 @@
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
+import psycopg2
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
-import os
 import json
 
-# Load the database connection string from the environment
-load_dotenv()
-DATABASE_URL = os.getenv('DATABASE_URL')
+# Streamlit page setup
+st.set_page_config(page_title="Client Data", page_icon="📊", layout="wide")
 
-# Ensure that DATABASE_URL is loaded correctly
-if DATABASE_URL is None:
-    raise ValueError("DATABASE_URL is not set in the environment variables.")
+# Load database credentials from Streamlit secrets
+db_params = {
+    'dbname': st.secrets["database"]["DB_NAME"],
+    'user': st.secrets["database"]["DB_USER"],
+    'password': st.secrets["database"]["DB_PASSWORD"],
+    'host': st.secrets["database"]["DB_HOST"],
+    'port': st.secrets["database"]["DB_PORT"]
+}
 
-# Establish database connection using SQLAlchemy
-def get_db_connection():
-    engine = create_engine(DATABASE_URL)
-    return engine.connect()
+# Function to establish connection and fetch data using psycopg2
+def fetch_data(query, params=None):
+    connection = None
+    cursor = None
+    try:
+        # Connect to the database
+        connection = psycopg2.connect(**db_params)
+        cursor = connection.cursor()
+        cursor.execute(query, params)
+        records = cursor.fetchall()
+        column_names = [desc[0] for desc in cursor.description]
+        df = pd.DataFrame(records, columns=column_names)
+        return df
+    except Exception as error:
+        st.error(f"Error fetching records: {error}")
+        return pd.DataFrame()  # Return an empty DataFrame on error
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
-# Function to fetch client and employee data
+# Function to fetch client data from the database
 def get_client_data():
     # Get the current time and the time from 4 days ago
     now = datetime.now()
@@ -46,13 +65,7 @@ def get_client_data():
     time_4_days_ago_str = time_4_days_ago.strftime('%Y-%m-%d %H:%M:%S')
 
     # Fetch data from the database
-    conn = get_db_connection()
-    try:
-        df = pd.read_sql(query, conn, params=(time_4_days_ago_str,))
-    finally:
-        conn.close()
-
-    return df
+    return fetch_data(query, params=(time_4_days_ago_str,))
 
 # Process the client data to extract address information and handle unique client_ids
 def process_data(df):
