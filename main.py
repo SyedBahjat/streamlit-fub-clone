@@ -38,13 +38,13 @@ def fetch_data(query, params=None):
         if connection:
             connection.close()
 
-# Function to fetch client data from the database
-def get_client_data():
+# Function to fetch client data for current_stage > 4
+def get_client_data_stage_greater_than_4():
     # Get the current time and the time from 4 days ago
     now = datetime.now()
     time_4_days_ago = now - timedelta(days=4)
     
-    # Query to fetch the required data
+    # Query to fetch the required data for current_stage > 4
     query = """
     SELECT 
         cp.client_id, 
@@ -58,6 +58,35 @@ def get_client_data():
     JOIN client c ON cp.client_id = c.id
     LEFT JOIN employee e ON c.assigned_employee = e.id
     WHERE cp.current_stage > 4
+    AND cp.created_on > %s;
+    """
+    
+    # Convert the 4-day time to string format for the query
+    time_4_days_ago_str = time_4_days_ago.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Fetch data from the database
+    return fetch_data(query, params=(time_4_days_ago_str,))
+
+# Function to fetch client data for current_stage < 4
+def get_client_data_stage_less_than_4():
+    # Get the current time and the time from 4 days ago
+    now = datetime.now()
+    time_4_days_ago = now - timedelta(days=4)
+    
+    # Query to fetch the required data for current_stage < 4
+    query = """
+    SELECT 
+        cp.client_id, 
+        cp.current_stage, 
+        cp.created_on, 
+        c.fullname AS client_fullname, 
+        c.fphone1, 
+        c.addresses,
+        e.fullname AS assigned_employee_fullname
+    FROM client_stage_progression cp
+    JOIN client c ON cp.client_id = c.id
+    LEFT JOIN employee e ON c.assigned_employee = e.id
+    WHERE cp.current_stage < 4
     AND cp.created_on > %s;
     """
     
@@ -95,9 +124,9 @@ def process_data(df):
     return df_unique_clients
 
 # Display the data in Streamlit with clickable phone numbers
-def display_clients(df):
+def display_clients(df, title):
     # Streamlit display setup
-    st.title("Clients with Current Stage > 4 (Last 4 Days)")
+    st.subheader(title)
     
     if df.empty:
         st.write("No clients found matching the criteria.")
@@ -113,14 +142,17 @@ def display_clients(df):
 
 # Main function to run the app
 def main():
-    # Get the data from the database
-    df = get_client_data()
+    # Get the data for clients with current_stage > 4 and current_stage < 4
+    df_stage_greater_than_4 = get_client_data_stage_greater_than_4()
+    df_stage_less_than_4 = get_client_data_stage_less_than_4()
     
     # Process the data to extract necessary details and ensure uniqueness
-    df_processed = process_data(df)
+    df_processed_greater_than_4 = process_data(df_stage_greater_than_4)
+    df_processed_less_than_4 = process_data(df_stage_less_than_4)
     
     # Display the data in Streamlit
-    display_clients(df_processed)
+    display_clients(df_processed_greater_than_4, "Clients with Current Stage > 4 (Last 4 Days)")
+    display_clients(df_processed_less_than_4, "Clients with Current Stage < 4 (Last 4 Days)")
 
 if __name__ == '__main__':
     main()
