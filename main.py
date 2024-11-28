@@ -3,6 +3,7 @@ import pandas as pd
 import psycopg2
 from datetime import datetime, timedelta
 import json
+import time
 
 # Database connection parameters (using Streamlit secrets for secure connection)
 db_params = {
@@ -131,30 +132,119 @@ def fetch_chat_data(db_params, client_id):
         cur.execute(client_query, (client_id,))
         client_info = cur.fetchone()
 
-        chat_transcript = ""
+        chat_transcript = []
         for timestamp, status, message in chats:
             if status == "Received":
-                chat_transcript += f"[{timestamp}] Client: {message}\n"
+                chat_transcript.append({"timestamp": timestamp, "role": "client", "message": message})
             else:
-                chat_transcript += f"[{timestamp}] Sales Rep: {message}\n"
+                chat_transcript.append({"timestamp": timestamp, "role": "sales_rep", "message": message})
 
         if client_info:
             client_name, client_id, assigned_employee_name = client_info
         else:
             client_name = "Client"
-            client_id = None
-            assigned_employee_name = None
-
-        client_url = f"<https://services.followupboss.com/2/people/view/{client_id}|{client_name}>"
+            assigned_employee_name = "Sales Rep"
 
         cur.close()
         conn.close()
 
-        return chat_transcript, client_name, client_url, assigned_employee_name
+        return chat_transcript, client_name, assigned_employee_name
 
     except Exception as e:
         st.error(f"Error fetching chat data for client ID {client_id}: {e}")
-        return "", "", "#", None
+        return [], None, None
+
+# Function to simulate a streaming response (sales rep)
+def response_generator(message):
+    response = f"Thank you for reaching out, {message}. I will get back to you soon."
+    for word in response.split():
+        yield word + " "
+        time.sleep(0.1)
+
+# Function to display chat UI with custom styling
+def display_chat_ui(chat_transcript, client_name, assigned_employee_name):
+    # Inject CSS to make chat bubbles
+    st.markdown("""
+    <style>
+        .chat-box {
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .client-message {
+            background-color: #d1f7ff;
+            align-self: flex-start;
+            max-width: 60%;
+            margin-bottom: 5px;
+            padding: 10px;
+            border-radius: 12px;
+        }
+        .sales-rep-message {
+            background-color: #f3f3f3;
+            align-self: flex-end;
+            max-width: 60%;
+            margin-bottom: 5px;
+            padding: 10px;
+            border-radius: 12px;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: gray;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Display chat history
+    for chat in chat_transcript:
+        role = chat["role"]
+        timestamp = chat["timestamp"]
+        message = chat["message"]
+
+        if role == "client":
+            st.markdown(f"""
+            <div class="chat-box">
+                <div class="client-message">
+                    <b>{client_name}</b> <span class="timestamp">({timestamp})</span>
+                    <p>{message}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        elif role == "sales_rep":
+            st.markdown(f"""
+            <div class="chat-box">
+                <div class="sales-rep-message">
+                    <b>{assigned_employee_name}</b> <span class="timestamp">({timestamp})</span>
+                    <p>{message}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Input box for new messages
+    prompt = st.chat_input("Type your message...")
+
+    if prompt:
+        # Add new user message (client message) to chat history
+        st.session_state.messages.append({"role": "client", "content": prompt})
+        st.markdown(f"""
+        <div class="chat-box">
+            <div class="client-message">
+                <b>{client_name}</b> <span class="timestamp">(Just now)</span>
+                <p>{prompt}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Display sales rep's simulated response (streaming)
+        with st.chat_message("sales_rep"):
+            for word in response_generator(prompt):
+                st.markdown(word, unsafe_allow_html=True)
+                st.experimental_rerun()  # To stream progressively
+
+        # Add sales rep's response to the session state
+        response = f"Thank you for reaching out, {prompt}. I will get back to you soon."
+        st.session_state.messages.append({"role": "sales_rep", "content": response})
 
 # Display the client data in Streamlit with clickable phone numbers and client links
 def display_clients(df, title):
@@ -180,13 +270,12 @@ def main():
         # Show chat transcript for selected client_id
         try:
             client_id = int(client_id_str)
-            chat_transcript, client_name, client_url, assigned_employee_name = fetch_chat_data(db_params, client_id)
+            chat_transcript, client_name, assigned_employee_name = fetch_chat_data(db_params, client_id)
             st.title(f"Chat with {client_name}")
-            st.markdown(f"Client: {client_url}")
             st.markdown(f"Assigned Employee: {assigned_employee_name}")
 
             if chat_transcript:
-                st.text_area("Chat Transcript", value=chat_transcript, height=400, disabled=True)
+                display_chat_ui(chat_transcript, client_name, assigned_employee_name)
             else:
                 st.write("No chat history available.")
         except ValueError:
