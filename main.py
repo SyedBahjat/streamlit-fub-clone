@@ -10,6 +10,10 @@ import json
 load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 
+# Ensure that DATABASE_URL is loaded correctly
+if DATABASE_URL is None:
+    raise ValueError("DATABASE_URL is not set in the environment variables.")
+
 # Establish database connection using SQLAlchemy
 def get_db_connection():
     engine = create_engine(DATABASE_URL)
@@ -17,9 +21,9 @@ def get_db_connection():
 
 # Function to fetch client and employee data
 def get_client_data():
-    # Get the current time and the time from 24 hours ago
+    # Get the current time and the time from 4 days ago
     now = datetime.now()
-    time_24_hours_ago = now - timedelta(days=4)
+    time_4_days_ago = now - timedelta(days=4)
     
     # Query to fetch the required data
     query = """
@@ -38,13 +42,13 @@ def get_client_data():
     AND cp.created_on > %s;
     """
     
-    # Convert the 24-hour time to string format for the query
-    time_24_hours_ago_str = time_24_hours_ago.strftime('%Y-%m-%d %H:%M:%S')
+    # Convert the 4-day time to string format for the query
+    time_4_days_ago_str = time_4_days_ago.strftime('%Y-%m-%d %H:%M:%S')
 
     # Fetch data from the database
     conn = get_db_connection()
     try:
-        df = pd.read_sql(query, conn, params=(time_24_hours_ago_str,))
+        df = pd.read_sql(query, conn, params=(time_4_days_ago_str,))
     finally:
         conn.close()
 
@@ -80,7 +84,7 @@ def process_data(df):
 # Display the data in Streamlit with clickable phone numbers
 def display_clients(df):
     # Streamlit display setup
-    st.title("Clients with Current Stage > 4 (Last 24 Hours)")
+    st.title("Clients with Current Stage > 4 (Last 4 Days)")
     
     if df.empty:
         st.write("No clients found matching the criteria.")
