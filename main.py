@@ -222,29 +222,30 @@ def display_chat_ui(chat_transcript, client_name, assigned_employee_name):
             """, unsafe_allow_html=True)
 
     # Input box for new messages
-    prompt = st.chat_input("Type your message...")
+    # prompt = st.chat_input("Type your message...")
+    st.write("This is a read-only chat view. Input is disabled.")
+    # prompt = None
+    # if prompt:
+    #     # Add new user message (client message) to chat history
+    #     st.session_state.messages.append({"role": "client", "content": prompt})
+    #     st.markdown(f"""
+    #     <div class="chat-box">
+    #         <div class="client-message">
+    #             <b>{client_name}</b> <span class="timestamp">(Just now)</span>
+    #             <p>{prompt}</p>
+    #         </div>
+    #     </div>
+    #     """, unsafe_allow_html=True)
 
-    if prompt:
-        # Add new user message (client message) to chat history
-        st.session_state.messages.append({"role": "client", "content": prompt})
-        st.markdown(f"""
-        <div class="chat-box">
-            <div class="client-message">
-                <b>{client_name}</b> <span class="timestamp">(Just now)</span>
-                <p>{prompt}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    #     # Display sales rep's simulated response (streaming)
+    #     with st.chat_message("sales_rep"):
+    #         for word in response_generator(prompt):
+    #             st.markdown(word, unsafe_allow_html=True)
+    #             st.experimental_rerun()  # To stream progressively
 
-        # Display sales rep's simulated response (streaming)
-        with st.chat_message("sales_rep"):
-            for word in response_generator(prompt):
-                st.markdown(word, unsafe_allow_html=True)
-                st.experimental_rerun()  # To stream progressively
-
-        # Add sales rep's response to the session state
-        response = f"Thank you for reaching out, {prompt}. I will get back to you soon."
-        st.session_state.messages.append({"role": "sales_rep", "content": response})
+    #     # Add sales rep's response to the session state
+    #     response = f"Thank you for reaching out, {prompt}. I will get back to you soon."
+    #     st.session_state.messages.append({"role": "sales_rep", "content": response})
 
 # Display the client data in Streamlit with clickable phone numbers and client links
 def display_clients(df, title):
